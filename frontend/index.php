@@ -1,5 +1,43 @@
 <?php
-// Получаем данные из формы
+require 'vendor/autoload.php'; // Подключаем Composer для библиотек (например, firebase/php-jwt)
+
+use \Firebase\JWT\JWT;
+
+$key = "secret_key"; // Ваш секретный ключ для подписи JWT
+
+// Функция для декодирования и проверки JWT токена
+function validateJWT($jwt, $key) {
+    try {
+        // Декодируем JWT токен, без передачи заголовков по ссылке
+        $decoded = JWT::decode($jwt, $key, ['HS256']);
+        return (object) ['valid' => true, 'data' => $decoded];
+    } catch (Exception $e) {
+        return (object) ['valid' => false, 'message' => $e->getMessage()];
+    }
+}
+
+// Получаем JWT токен из cookies
+$jwt = isset($_COOKIE['jwt']) ? $_COOKIE['jwt'] : '';
+
+// Проверяем, авторизован ли пользователь
+$isAuthenticated = false;
+$userData = null;
+
+if ($jwt) {
+    $validationResult = validateJWT($jwt, $key);
+    if ($validationResult->valid) {
+        $isAuthenticated = true;
+        $userData = $validationResult->data;
+    }
+}
+
+// Выход из системы: удаляем cookie
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['logout'])) {
+    setcookie('jwt', '', time() - 3600, '/');  // Удаляем JWT cookie
+    header("Location: /"); // Перенаправляем на главную страницу после выхода
+    exit();
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $value = $_POST['value'];
     $from = $_POST['from'];
@@ -42,7 +80,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <title>Конвертер валют</title>
     <style>
         body {
-            font-family: 'Arial', sans-serif;
+            font-family: Arial, sans-serif;
             background-color: #f4f4f9;
             margin: 0;
             padding: 0;
@@ -50,132 +88,136 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             justify-content: center;
             align-items: center;
             height: 100vh;
-            position: relative;
+        }
+
+        .auth-container, .converter-container {
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
         }
 
         h1 {
+            font-size: 24px;
             color: #333;
             margin-bottom: 20px;
         }
 
-        .converter-container {
-            background-color: #ffffff;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-            padding: 30px;
-            border-radius: 8px;
-            width: 400px;
-            text-align: center;
-        }
-
-        form {
-            display: flex;
-            flex-direction: column;
-        }
-
-        label {
-            text-align: left;
-            margin-bottom: 5px;
-            font-size: 16px;
-            color: #555;
-        }
-
-        input, select, button {
-            padding: 10px;
-            margin: 10px 0;
-            font-size: 16px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-
-        button {
+        .auth-button, .logout-button, button[type="submit"] {
             background-color: #4CAF50;
             color: white;
             border: none;
+            padding: 10px 20px;
+            margin-top: 20px;
+            border-radius: 5px;
             cursor: pointer;
+            font-size: 16px;
         }
 
-        button:hover {
+        .auth-button:hover, .logout-button:hover, button[type="submit"]:hover {
             background-color: #45a049;
         }
 
-        input[type="text"] {
-            width: 100%;
-            box-sizing: border-box;
-        }
-
-        select {
-            width: 100%;
-            box-sizing: border-box;
-        }
-
         .form-group {
-            margin-bottom: 20px;
+            margin-bottom: 15px;
+            text-align: left;
+        }
+
+        label {
+            font-size: 14px;
+            color: #555;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 16px;
         }
 
         #result {
             margin-top: 20px;
+            font-size: 18px;
             font-weight: bold;
+            color: #333;
         }
 
-        /* Стили для кнопки регистрации */
-        .auth-button {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            cursor: pointer;
-            border-radius: 4px;
-        }
-
-        .auth-button:hover {
-            background-color: #0056b3;
+        .user-info {
+            margin-bottom: 20px;
+            font-size: 18px;
+            color: #333;
         }
     </style>
 </head>
 <body>
 
-<button class="auth-button" onclick="window.location.href='http://localhost:8001'">Регистрация</button>
+<?php if (!$isAuthenticated): ?>
+    <div class="auth-container">
+        <h1>Пожалуйста, авторизуйтесь для использования сервиса</h1>
+        <button class="auth-button" onclick="window.location.href='http://localhost:8001'">Регистрация</button>
+    </div>
+<?php else: ?>
+    <!-- Выводим логин пользователя -->
+    <div class="user-info">
+        <h2>Добро пожаловать, <?php echo htmlspecialchars($userData->username); ?>!</h2>
+    </div>
 
-<div class="converter-container">
-    <h1>Конвертер валют</h1>
-    <form method="POST" action="">
-        <div class="form-group">
-            <label for="value">Сумма:</label>
-            <input type="text" name="value" id="value" placeholder="Введите сумму" required>
-        </div>
-
-        <div class="form-group">
-            <label for="from">Из валюты:</label>
-            <select name="from" id="from" required>
-                <option value="USD">USD</option>
-                <option value="EUR">EUR</option>
-            </select>
-        </div>
-
-        <div class="form-group">
-            <label for="to">В валюту:</label>
-            <select name="to" id="to" required>
-                <option value="EUR">EUR</option>
-                <option value="USD">USD</option>
-            </select>
-        </div>
-
-        <button type="submit">Конвертировать</button>
+    <!-- Кнопка выхода -->
+    <form method="POST">
+        <button class="logout-button" type="submit" name="logout">Выйти</button>
     </form>
 
-    <div id="result">
-        <?php
-        if (isset($result)) {
-            echo "Результат: " . $result;
-        } elseif (isset($error)) {
-            echo "Ошибка: " . $error;
-        }
-        ?>
+    <div class="converter-container">
+        <h1>Конвертер валют</h1>
+        <form id="currencyForm" method="POST">
+            <div class="form-group">
+                <label for="value">Сумма:</label>
+                <input type="text" name="value" id="value" placeholder="Введите сумму" required>
+            </div>
+
+            <div class="form-group">
+                <label for="from">Из валюты:</label>
+                <select name="from" id="from" required>
+                    <option value="USD">USD</option>
+                    <option value="EUR">EUR</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="to">В валюту:</label>
+                <select name="to" id="to" required>
+                    <option value="EUR">EUR</option>
+                    <option value="USD">USD</option>
+                </select>
+            </div>
+
+            <button type="submit">Конвертировать</button>
+        </form>
+
+        <div id="result">
+            <?php
+            if (isset($result)) {
+                echo "Результат: " . $result;
+            } elseif (isset($error)) {
+                echo "Ошибка: " . $error;
+            }
+            ?>
+        </div>
     </div>
-</div>
+<?php endif; ?>
+
+<script>
+    document.getElementById('currencyForm').onsubmit = function(event) {
+        event.preventDefault();
+
+        const jwtToken = document.cookie.replace(/(?:(?:^|.*;\s*)jwt\s*\=\s*([^;]*).*$)|^.*$/, "$1");
+
+
+</script>
 
 </body>
 </html>

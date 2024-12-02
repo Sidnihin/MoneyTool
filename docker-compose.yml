@@ -1,4 +1,3 @@
-version: '3.8'
 services:
   frontend:
     build: ./frontend
@@ -7,9 +6,7 @@ services:
     depends_on:
       - auth
       - converter
-      - history
       - db
-
   auth:
     build: ./auth
     ports:
@@ -23,15 +20,6 @@ services:
     build: ./converter
     ports:
       - "8002:8002"
-
-  history:
-    build: ./history
-    ports:
-      - "8003:8003"
-    environment:
-      - DATABASE_URL=postgres://user:password@db:5432/lab_db
-    depends_on:
-      - db
 
   db:
     image: postgres:latest

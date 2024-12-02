@@ -1,0 +1,7 @@
+{
+  "name": "moneytool/app",
+  "description": "JWT authentication and currency converter",
+  "require": {
+    "firebase/php-jwt": "^5.0"
+  }
+}
